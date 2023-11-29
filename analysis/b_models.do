@@ -1,6 +1,6 @@
 *-------------------------------------------------------------------------------
 * BREADWINNER PROJECT
-* predicting_consequences.do
+* models.do
 * Kim McErlean
 *-------------------------------------------------------------------------------
 di "$S_DATE"
@@ -8,17 +8,16 @@ di "$S_DATE"
 ********************************************************************************
 * DESCRIPTION
 ********************************************************************************
-* This file....
+* This file creates some variable recodes and runs models
 
-use "$tempdir/combined_bw_equation.dta", clear
-keep if survey == 2014
+use "$SIPP14keep/annual_bw_status2014.dta", clear // created in step 10
 
 ********************************************************************************
 * CREATE SAMPLE AND VARIABLES
 ********************************************************************************
 
 * Create dependent variable: income / pov change change
-gen inc_pov = thearn_adj / threshold
+gen inc_pov = thearn_alt / threshold
 sort SSUID PNUM year
 by SSUID PNUM (year), sort: gen inc_pov_change = ((inc_pov-inc_pov[_n-1])/inc_pov[_n-1]) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==year[_n-1]+1
 by SSUID PNUM (year), sort: gen inc_pov_change_raw = (inc_pov-inc_pov[_n-1]) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==year[_n-1]+1
@@ -73,7 +72,7 @@ label values mechanism mechanism
 // some lagged measures I need
 sort SSUID PNUM year
 gen earnings_lag = earnings[_n-1] if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1)
-gen thearn_lag = thearn_adj[_n-1] if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1)
+gen thearn_lag = thearn_alt[_n-1] if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1)
 
 * Creating necessary independent variables
  // one variable for all pathways
@@ -143,12 +142,26 @@ recode race (1=1) (2=2)(4=3)(3=4)(5=4), gen(race_gp)
 label define race_gp 1 "White" 2 "Black" 3 "Hispanic"
 label values race_gp race_gp
 
+// education recode
+recode educ (1/2=1) (3=2) (4=3), gen(educ_gp)
+label define educ_gp 1 "Hs or Less" 2 "Some College" 3 "College Plus"
+label values educ_gp educ_gp
+
+// age at first birth recode
+recode ageb1 (-5/19=1) (20/24=2) (25/29=3) (30/55=4), gen(ageb1_cat)
+label define ageb1_cat 1 "Under 20" 2 "A20-24" 3 "A25-29" 4 "Over 30"
+label values ageb1_cat ageb1_cat
+
+// marital status recode
+recode marital_status_t1 (1/2=1)(3=0), gen(partnered)
+recode partnered (0=1)(1=0), gen(single)
+
 // household income change
-by SSUID PNUM (year), sort: gen hh_income_chg = ((thearn_adj-thearn_adj[_n-1])/thearn_adj[_n-1]) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1) & trans_bw60_alt2==1
-by SSUID PNUM (year), sort: gen hh_income_raw = ((thearn_adj-thearn_adj[_n-1])) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1) & trans_bw60_alt2==1
-browse SSUID PNUM year thearn_adj bw60 trans_bw60_alt2 hh_income_chg hh_income_raw
+by SSUID PNUM (year), sort: gen hh_income_chg = ((thearn_alt-thearn_alt[_n-1])/thearn_alt[_n-1]) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1) & trans_bw60_alt2==1
+by SSUID PNUM (year), sort: gen hh_income_raw = ((thearn_alt-thearn_alt[_n-1])) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1) & trans_bw60_alt2==1
+browse SSUID PNUM year thearn_alt bw60 trans_bw60_alt2 hh_income_chg hh_income_raw
 	
-by SSUID PNUM (year), sort: gen hh_income_raw_all = ((thearn_adj-thearn_adj[_n-1])) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1) & bw60lag==0
+by SSUID PNUM (year), sort: gen hh_income_raw_all = ((thearn_alt-thearn_alt[_n-1])) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1) & bw60lag==0
 	
 inspect hh_income_raw // almost split 50/50 negative v. positive
 sum hh_income_raw, detail // i am now wondering - is this the better way to do it?
@@ -220,15 +233,15 @@ drop _merge
 * Get percentiles
 //browse SSUID year bw60 bw60lag
 
-sum thearn_adj if year==(year[_n+1]-1) & SSUID[_n+1]==SSUID  [aweight=wpfinwgt], detail // is this t-1? this is in demography paper
-sum thearn_adj, detail // then this would be t?
-sum thearn_adj if bw60lag==0, detail // is this t-1?
-sum thearn_adj if bw60==1, detail // is this t? okay definitely not
+sum thearn_alt if year==(year[_n+1]-1) & SSUID[_n+1]==SSUID  [aweight=wpfinwgt], detail // is this t-1? this is in demography paper
+sum thearn_alt, detail // then this would be t?
+sum thearn_alt if bw60lag==0, detail // is this t-1?
+sum thearn_alt if bw60==1, detail // is this t? okay definitely not
 
-xtile percentile = thearn_adj, nq(10)
+xtile percentile = thearn_alt, nq(10)
 
 forvalues p=1/10{
-	sum thearn_adj if percentile==`p'
+	sum thearn_alt if percentile==`p'
 }
 
 /*
@@ -257,16 +270,16 @@ replace pre_percentile=9 if thearn_lag>= 107478	& thearn_lag<=151012
 replace pre_percentile=10 if thearn_lag>= 151072 & thearn_lag<= 2000316
 
 gen post_percentile=.
-replace post_percentile=1 if thearn_adj>=0 & thearn_adj<= 4942
-replace post_percentile=2 if thearn_adj>= 4950 & thearn_adj<= 18052
-replace post_percentile=3 if thearn_adj>= 18055 & thearn_adj<= 28058
-replace post_percentile=4 if thearn_adj>= 28061	& thearn_adj<=38763
-replace post_percentile=5 if thearn_adj>= 38769 & thearn_adj<= 51120
-replace post_percentile=6 if thearn_adj>= 51136	& thearn_adj<=	65045
-replace post_percentile=7 if thearn_adj>= 65051	& thearn_adj<=	82705
-replace post_percentile=8 if thearn_adj>= 82724	& thearn_adj<=	107473
-replace post_percentile=9 if thearn_adj>= 107478	& thearn_adj<=151012
-replace post_percentile=10 if thearn_adj>= 151072 & thearn_adj<= 2000316
+replace post_percentile=1 if thearn_alt>=0 & thearn_alt<= 4942
+replace post_percentile=2 if thearn_alt>= 4950 & thearn_alt<= 18052
+replace post_percentile=3 if thearn_alt>= 18055 & thearn_alt<= 28058
+replace post_percentile=4 if thearn_alt>= 28061	& thearn_alt<=38763
+replace post_percentile=5 if thearn_alt>= 38769 & thearn_alt<= 51120
+replace post_percentile=6 if thearn_alt>= 51136	& thearn_alt<=	65045
+replace post_percentile=7 if thearn_alt>= 65051	& thearn_alt<=	82705
+replace post_percentile=8 if thearn_alt>= 82724	& thearn_alt<=	107473
+replace post_percentile=9 if thearn_alt>= 107478	& thearn_alt<=151012
+replace post_percentile=10 if thearn_alt>= 151072 & thearn_alt<= 2000316
 
 gen percentile_chg = post_percentile-pre_percentile
 
@@ -287,7 +300,7 @@ replace hh_income_topcode = `r(p95)' if hh_income_raw_all>`r(p95)'
 
 gen income_chg_top = hh_income_topcode / thearn_lag
 
-// browse SSUID thearn_adj thearn_lag hh_income_raw_all hh_income_topcode hh_income_chg income_chg_top
+// browse SSUID thearn_alt thearn_lag hh_income_raw_all hh_income_topcode hh_income_chg income_chg_top
 sum hh_income_chg, detail
 sum income_chg_top, detail
 
@@ -311,7 +324,7 @@ regress log_income_change i.trans_bw60_alt2 i.educ_gp i.race i.rel_status ageb1 
 keep if trans_bw60_alt2==1 & bw60lag==0
 
 ** exploratory things
-// browse SSUID PNUM year thearn_adj thearn_lag hh_income_chg hh_income_raw
+// browse SSUID PNUM year thearn_alt thearn_lag hh_income_chg hh_income_raw
 inspect hh_income_chg // so about 200 are missing, which means hh income was 0 in the year prior to her becoming BW, make those 100%?
 gen hh_income_chg_x = hh_income_chg
 replace hh_income_chg_x = 1 if hh_income_chg==.
@@ -335,9 +348,9 @@ tabstat hh_income_topcode if hh_chg_value==0, stats(mean p50)
 tabstat hh_income_chg if hh_chg_value==0, stats(mean p50)
 tabstat hh_income_topcode if hh_chg_value==1, stats(mean p50)
 
-sum thearn_adj, detail
-gen thearn_topcode=thearn_adj
-replace thearn_topcode = `r(p99)' if thearn_adj>`r(p99)'
+sum thearn_alt, detail
+gen thearn_topcode=thearn_alt
+replace thearn_topcode = `r(p99)' if thearn_alt>`r(p99)'
 sum thearn_topcode, detail
 
 sum thearn_lag, detail
@@ -436,45 +449,6 @@ tab marital_status_t1, gen(marst)
 ********************************************************************************
 * ANALYSIS
 ********************************************************************************
-/* this doesn't make sense because this variable now takes into account prior pov status
-tab pov_lag pov_change_detail, row
-tab pov_change_detail pov_lag, row
-
-forvalues p=1/5{
-	display `p'
-	tab pov_change_detail pov_lag if pathway==`p', row
-}
-
-forvalues e=1/3{
-	display `e'
-	tab pov_change_detail pov_lag if educ_gp==`e', row
-}
-
-forvalues r=1/5{
-	display `r'
-	tab pov_change_detail pov_lag if race==`r', row
-}
-
-forvalues rs=1/3{
-	display `rs'
-	tab pov_change_detail pov_lag if rel_status_detail==`rs', row
-}
-
-forvalues rs=1/2{
-	display `rs'
-	tab pov_change_detail pov_lag if rel_status==`rs', row
-}
-
-tab pathway pov_change_detail if pov_lag==0, row nofreq
-tab pathway pov_change_detail if pov_lag==1, row nofreq
-
-tab race pov_change_detail if pov_lag==0, row nofreq
-tab race pov_change_detail if pov_lag==1, row nofreq
-
-tab educ_gp pov_change_detail if pov_lag==0, row nofreq
-tab educ_gp pov_change_detail if pov_lag==1, row nofreq
-*/
-
 tabstat inc_pov, by(pov_lag)
 tabstat inc_pov_lag, by(pov_lag)
 tab educ_gp pov_lag, row
@@ -486,19 +460,19 @@ tab single_all pov_change_detail if start_from_0==0, row nofreq
 tab relationship pov_change_detail, row nofreq
 
 sum thearn_lag, detail  // pre 2014 -- matches paper
-sum thearn_adj, detail // post 2014 -- matches paper
+sum thearn_alt, detail // post 2014 -- matches paper
 
 sum thearn_lag if single_all==1, detail
-sum thearn_adj if single_all==1, detail
+sum thearn_alt if single_all==1, detail
 
 sum thearn_lag if partnered_all==1, detail
-sum thearn_adj if partnered_all==1, detail
+sum thearn_alt if partnered_all==1, detail
 
 sum thearn_lag if relationship==1, detail
-sum thearn_adj if relationship==1, detail
+sum thearn_alt if relationship==1, detail
 
 sum thearn_lag if relationship==2, detail
-sum thearn_adj if relationship==2, detail
+sum thearn_alt if relationship==2, detail
 
 ********************************************************************************
 * Demographics by outcome and pathway
@@ -535,7 +509,7 @@ tab pathway pov_change_detail if educ_gp==1, row
 histogram hh_income_raw if hh_income_raw > -50000 & hh_income_raw <50000, kdensity width(5000) addlabel addlabopts(yvarformat(%4.1f)) percent xlabel(-50000(10000)50000) title("Household income change upon transition to BW") xtitle("HH income change")
 histogram inc_pov_change_raw if inc_pov_change_raw < 5 & inc_pov_change_raw >-5, width(.5) xlabel(-5(0.5)5) addlabel addlabopts(yvarformat(%4.1f)) percent
 
-browse SSUID PNUM year earnings_adj earnings_lag thearn_adj thearn_lag hh_income_raw inc_pov inc_pov_lag inc_pov_change_raw
+browse SSUID PNUM year earnings earnings_lag thearn_alt thearn_lag hh_income_raw inc_pov inc_pov_lag inc_pov_change_raw
 
 histogram hh_income_raw if hh_income_raw > -50000 & hh_income_raw <50000 & single_all==1, kdensity width(5000) addlabel addlabopts(yvarformat(%4.1f)) percent xlabel(-50000(10000)50000) title("Household income change upon transition to BW") xtitle("HH income change") // single moms
 
@@ -550,58 +524,14 @@ replace mom_earn_change=0 if mom_gain_earn==0 & earnup8_all==0 & mom_lose_earn==
 replace mom_earn_change=1 if earnup8_all==1
 replace mom_earn_change=0 if mom_earn_change==. // the very small mom ups - want to be considered no change
 replace mom_earn_change=1 if mom_earn_change==0 & mt_mom==1 // BUT want the very small moms if ONLY mom's earnings went up, because there is nowhere else to put
-/*
-gen pathway_detail=.
-replace pathway_detail=1 if pathway==1 // no earnings prior
-replace pathway_detail=2 if pathway==2 // she had earnings
-replace pathway_detail=3 if pathway==4 & earnings_sp_adj==0 // partner down to 0
-replace pathway_detail=4 if pathway==4 & earnings_sp_adj!=0 // partner not down to 0
-replace pathway_detail=5 if pathway==3
-replace pathway_detail=6 if pathway==6 & inlist(mom_earn_change,-1,0) & end_as_sole==1 // just other, down to 0
-replace pathway_detail=7 if pathway==6 & inlist(mom_earn_change,-1,0) & end_as_sole==0 // just other, not down to 0
-replace pathway_detail=8 if pathway==6 & mom_earn_change==1 // both
-replace pathway_detail=9 if pathway==5 & inlist(mom_earn_change,-1,0) // just partner left
-replace pathway_detail=10 if pathway==5 & mom_earn_change==1 // partner left and her earnings up
 
-label define pathway_detail 1 "Mom Up from 0" 2 "Mom Up" 3 "Partner Down to 0" 4 "Partner Down" 5 "Mom Up Partner Down" 6 "Other Down to 0" 7 "Other Down" 8 "Mom Up Other Down" 9 "Dissolution" 10 "Dissolution Mom Up"
-label values pathway_detail pathway_detail
-
-browse SSUID PNUM earnings_adj earnings_lag earnings_sp_adj thearn_adj thearn_lag pathway_detail earnings_ratio end_as_sole mom_earn_change
-sum earn_change_sp
-sum earn_change_raw_sp
-sum earn_change_raw_sp if pathway_detail==3
-sum earn_change_raw_sp if pathway_detail==4
-sum earnings_sp_adj if pathway_detail==3
-sum earnings_sp_adj if pathway_detail==4
-
-tabstat hh_income_raw, by(pathway) stats(mean p50)
-tabstat thearn_adj, by(pathway) stats(mean p50)
-tabstat hh_income_raw, by(pathway_detail) stats(mean p50)
-tabstat thearn_adj, by(pathway_detail) stats(mean p50)
-tabstat hh_income_topcode, by(pathway) stats(mean p50)
-tabstat hh_income_topcode, by(pathway_detail) stats(mean p50)
-
-gen pathway_final=.
-replace pathway_final=1 if pathway_detail==1 // mom up from 0
-replace pathway_final=2 if pathway_detail==2 // mom up
-replace pathway_final=3 if inlist(pathway_detail,3,4,9) // partner down or left, mom no change
-replace pathway_final=4 if inlist(pathway_detail,6,7) // other down, mom no change
-replace pathway_final=5 if inlist(pathway_detail,5,10) // partner down or left, mom up
-replace pathway_final=6 if pathway_detail==8 // other down, mom up
-
-label define pathway_final 1 "Mom Up from 0" 2 "Mom up" 3 "Partner Down" 4 "Other Down" 5 "Partner Down Mom Up" 6 "Other Down Mom Up"
-label values pathway_final pathway_final
-
-tabstat hh_income_raw, by(pathway_final) stats(mean p50)
-tabstat thearn_adj, by(pathway_final) stats(mean p50)
-*/
 tabstat hh_income_raw, by(educ_gp) stats(mean p50)
 tabstat hh_income_topcode, by(educ_gp) stats(mean p50)
-tabstat thearn_adj, by(educ_gp) stats(mean p50)
+tabstat thearn_alt, by(educ_gp) stats(mean p50)
 
 tabstat hh_income_raw, by(race) stats(mean p50)
 tabstat hh_income_topcode, by(race) stats(mean p50)
-tabstat thearn_adj, by(race) stats(mean p50)
+tabstat thearn_alt, by(race) stats(mean p50)
 
 ********************************************************************************
 **# Descriptives to use
@@ -673,7 +603,7 @@ tabstat hh_income_raw if hh_chg_value==0, by(educ_x_race) stats(mean p50) // ave
 tabstat hh_income_raw if hh_chg_value==1, by(educ_x_race) stats(mean p50) // average increase
 
 // variance pre / post (for these households or for ALL)
-tabstat thearn_lag thearn_adj, stats(mean p50 sd var cv range)
+tabstat thearn_lag thearn_alt, stats(mean p50 sd var cv range)
 
 tab pathway_v1  pov_change_detail, row
 tab pathway pov_change_detail, row
@@ -708,8 +638,6 @@ forvalues x=1/3{
 }
 
 
-
-
 forvalues p=1/6{
 	display `p'
 	tab pov_change_detail income_change if pathway==`p', row
@@ -737,12 +665,12 @@ forvalues rs=1/2{
 
 forvalues e=1/3{
 	display `e'
-	tab pathway_final pov_change_detail if educ_gp==`e', row nofreq
+	tab pathway pov_change_detail if educ_gp==`e', row nofreq
 }
 
 forvalues r=1/5{
 	display `r'
-	tab pathway_final pov_change_detail if race==`r', row nofreq
+	tab pathway pov_change_detail if race==`r', row nofreq
 }
 
 ****************************************************************************
@@ -834,9 +762,6 @@ regress hh_income_chg_x i.pathway
 regress hh_income_chg_x ib3.pathway
 regress hh_income_chg_x ib3.pathway i.race i.educ_gp
 regress hh_income_chg_x ib3.pathway i.race i.educ_gp i.pov_lag
-
-regress income_chg_top_x ib3.pathway i.race_gp i.educ_gp
-regress income_chg_top_x ib3.pathway i.race_gp i.educ_gp i.pov_lag
 
 // topcoding change
 sum hh_income_chg_x, detail
@@ -962,20 +887,20 @@ regress hh_income_raw_all ib2.rel_status_detail i.educ_gp i.race // single is ma
 // what if I put in 1000s?
 gen hh_income_1000s = hh_income_topcode / 1000
 
-regress hh_income_topcode ib6.pathway_final
-regress hh_income_topcode ib6.pathway_final ib2.rel_status_detail i.educ_gp i.race // use these coefficients for pathway, education, and race
-regress hh_income_1000s ib6.pathway_final
+regress hh_income_topcode ib6.pathway
+regress hh_income_topcode ib6.pathway ib2.rel_status_detail i.educ_gp i.race // use these coefficients for pathway, education, and race
+regress hh_income_1000s ib6.pathway
 
 // interactions
-regress hh_income_topcode ib6.pathway_final
+regress hh_income_topcode ib6.pathway
 regress hh_income_topcode i.educ_gp // nothing sig
-regress hh_income_topcode ib6.pathway_final##i.educ_gp // college plus main effect becomes sig. few interactions sig except college plus partner down and other down (more negative)
-margins pathway_final#educ_gp
+regress hh_income_topcode ib6.pathway##i.educ_gp // college plus main effect becomes sig. few interactions sig except college plus partner down and other down (more negative)
+margins pathway#educ_gp
 marginsplot
 
 regress hh_income_topcode i.race // nothing sig
-regress hh_income_topcode ib6.pathway_final##i.race if inlist(race,1,2,4) // black main effect becomes marginally sig.  some interactions with Black and other down, partner down (more positive?)
-margins pathway_final#race
+regress hh_income_topcode ib6.pathway##i.race if inlist(race,1,2,4) // black main effect becomes marginally sig.  some interactions with Black and other down, partner down (more positive?)
+margins pathway#race
 marginsplot
 
 /*
@@ -1050,8 +975,8 @@ margins rel_status_detail
 margins educ_gp
 margins race
 
-logit in_pov ib6.pathway_final ib2.rel_status_detail i.educ_gp i.race, or // use these for pathway, race, educ
-logit in_pov ib6.pathway_final ib2.rel_status_detail i.educ_gp i.race i.pov_lag, or
+logit in_pov ib6.pathway ib2.rel_status_detail i.educ_gp i.race, or // use these for pathway, race, educ
+logit in_pov ib6.pathway ib2.rel_status_detail i.educ_gp i.race i.pov_lag, or
 
 /// OKAY, effect of transitioning - interaction
 regress log_income_change i.trans_bw60_alt2 if pathway!=0
@@ -1083,8 +1008,6 @@ tab rel_status pov_change_detail, row
 tab partnered_no_chg pov_change_detail, row // to get those partnered all year
 tab pathway end_as_sole, row nofreq // proxy for partner going down to 0? (or whoever lost earnings)
 tab pathway pov_change_detail, row nofreq
-tab pathway_detail pov_change_detail, row nofreq
-tab pathway_final pov_change_detail, row nofreq
 
 mlogit pov_change i.race, rrr
 mlogit pov_change i.educ_gp, rrr
@@ -1110,18 +1033,18 @@ margins i.rel_status_detail
 
 // end pov
 histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000, percent addlabel width(5000) // all
-graph export "$results\all_income_changes.png", as(png) name("Graph")
+graph export "$results\all_income_changes.png", as(png) name("Graph") replace
 histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & in_pov==1, percent addlabel width(5000) // in pov
-graph export "$results\all_income_changes_inpov.png", as(png) name("Graph")
+graph export "$results\all_income_changes_inpov.png", as(png) name("Graph") replace
 histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & in_pov==0, percent addlabel width(5000) // not in pov
-graph export "$results\all_income_changes_notinpov.png", as(png) name("Graph")
+graph export "$results\all_income_changes_notinpov.png", as(png) name("Graph") replace
 
 // mlabformat(%fmt)
 
 twoway (histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & in_pov==1, percent width(5000) color(red%30)) ///
 (histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & in_pov==0, percent width(5000) color(dkgreen%30)), ///
 legend(order(1 "In financial hardship" 2 "Not in financial hardship" )) xlabel(-50000(5000)50000, labsize(vsmall) angle(forty_five) valuelabel) xtitle("Household Income Change") ytitle("Percent Distribution") graphregion(fcolor(white))
-graph export "$results\income_change_by_pov.png", as(png) name("Graph")
+graph export "$results\income_change_by_pov.png", as(png) name("Graph") replace
 
 
 // started in pov
@@ -1129,130 +1052,6 @@ histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000, percent
 histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & pov_lag==1, percent addlabel width(5000) // in pov
 histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & pov_lag==0, percent addlabel width(5000) // not in pov
 
-
-********************************************************************************
-**# Bookmark #2
-* Descriptive: pathway by race / educ + categorical outcome
-********************************************************************************
-tab pov_change_detail, gen(outcome)
-
-putexcel set "$results/Breadwinner_Impact_Tables", sheet(Table5) modify
-putexcel A1:F1 = "Household Economic Well-Being Changes when Mom Becomes Primary Earner: 2014", merge border(bottom) hcenter
-putexcel A2 = "Category"
-putexcel B2 = "Label"
-putexcel C2 = ("Moved out") D2 = ("Stayed out") E2 = ("Stayed in") F2 = ("Moved in")
-
-/// split pathways by race / educ
-putexcel A3:A7 = "HS or Less", merge hcenter
-putexcel A8:A12 = "Some College", merge hcenter
-putexcel A13:A17 = "College", merge hcenter
-putexcel A18:A22 = "White", merge hcenter
-putexcel A23:A27 = "Black", merge hcenter
-putexcel A28:A32 = "Hispanic", merge hcenter
-putexcel B3 = ("Partner Left") B4 = ("Mom Up") B5 = ("Partner Down") B6 = ("Mom Up Partner Down") B7 = ("Other HH Member")
-putexcel B8 = ("Partner Left") B9 = ("Mom Up") B10 = ("Partner Down") B11 = ("Mom Up Partner Down") B12 = ("Other HH Member")
-putexcel B13 = ("Partner Left") B14 = ("Mom Up") B15 = ("Partner Down") B16 = ("Mom Up Partner Down") B17 = ("Other HH Member")
-putexcel B18 = ("Partner Left") B19 = ("Mom Up") B20 = ("Partner Down") B21 = ("Mom Up Partner Down") B22 = ("Other HH Member")
-putexcel B23 = ("Partner Left") B24 = ("Mom Up") B25 = ("Partner Down") B26 = ("Mom Up Partner Down") B27 = ("Other HH Member")
-putexcel B28 = ("Partner Left") B29 = ("Mom Up") B30 = ("Partner Down") B31 = ("Mom Up Partner Down") B32 = ("Other HH Member")
-
-local colu "C D E F"
-
-forvalues e=1/3{
-	local x=1
-		foreach var in ft_partner_leave	mt_mom ft_partner_down_only ft_partner_down_mom lt_other_changes{
-		local row = (`e' * 5) -3 + `x'
-			forvalues i=1/4{
-			local col: word `i' of `colu'
-			sum outcome`i' if trans_bw60_alt2==1 & survey_yr==2 & `var'==1 &	educ_gp==`e', detail // 2014
-			putexcel `col'`row'=`r(mean)', nformat(#.##%)
-			}
-		local ++x
-	}
-}
-
-local colu "C D E F"
-
-forvalues r=1/3{
-	local x=1
-		foreach var in ft_partner_leave	mt_mom ft_partner_down_only ft_partner_down_mom lt_other_changes{
-		local row = (`r' * 5) +12 + `x'
-			forvalues i=1/4{
-			local col: word `i' of `colu'
-			sum outcome`i' if trans_bw60_alt2==1 & survey_yr==2 & `var'==1 &	race_gp==`r', detail // 2014
-			putexcel `col'`row'=`r(mean)', nformat(#.##%)
-			}
-		local ++x
-	}
-}
-
-// validate
-tab pathway outcome if educ_gp==1, row nofreq
-
-********************************************************************************
-**# Figures
-********************************************************************************
-*Okay, so this is in JFEI, but I think I used the graph editor to change plottype to rarea. Okay i can recast duh kim
-twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000, width(2000) percent recast(rarea) xline(0,lcolor(black)) color(gray%60)), xlabel(-75000(5000)75000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change")  ylabel(, labsize(small)) ytitle("Percent Distribution of Households") graphregion(fcolor(white))
-
-twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000, width(2000) percent recast(rarea) xline(0,lcolor(black)) color(gray%60)), xlabel(-70000(10000)70000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change")  ylabel(, labsize(small)) ytitle("Percent Distribution of Households") graphregion(fcolor(white)) ysize(6) xsize(8)
-
-* Education
-twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000 & educ_gp==1, width(4000) percent recast(rarea) xline(0,lcolor(black)) color(gray%40)), xlabel(-70000(70000)70000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change")  ylabel(0(15)15, labsize(small)) ytitle("Percent Distribution") graphregion(fcolor(white)) ysize(4.5) xsize(6)
-
-// twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000 & educ_gp==1, width(4000) percent recast(rarea) xline(0,lcolor(black)) color(gray%40)), xlabel(-75000(5000)75000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change")  ylabel(0(5)15, labsize(small)) ytitle("Percent Distribution") graphregion(fcolor(white)) ysize(4.5) xsize(8)
-
-twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000 & educ_gp==2, width(4000) percent recast(rarea) xline(0,lcolor(black)) color(gray%40)), xlabel(-70000(70000)70000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change")  ysc(off) ylabel(0(15)15, labsize(small)) ytitle("") graphregion(fcolor(white)) ysize(4.5) xsize(6) // yscale(lstyle(none))
-
-twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000 & educ_gp==3, width(4000) percent recast(rarea) xline(0,lcolor(black)) color(gray%40)), xlabel(-70000(70000)70000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change") ysc(off) ylabel(0(15)15, labsize(small))ytitle("Percent Distribution") graphregion(fcolor(white)) ysize(4.5) xsize(6)
-/*
-twoway (histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & educ_gp==1, percent width(1000) color(red%30) recast(area) xline(0)) ///
-(histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & educ_gp==3, percent width(1000) color(blue%30) recast(area)), ///
-legend(order(1 "LTHS" 2 "College" )) xlabel(-50000(5000)50000, labsize(vsmall) angle(forty_five) valuelabel) xtitle("Household Income Change") ytitle("Percent Distribution") graphregion(fcolor(white))
-
-twoway (histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & educ_gp==1, percent width(4000) recast(area) color(red%30) xline(0)) ///
-(histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & educ_gp==3, percent width(4000) recast(area) color(blue%30)), ///
-legend(order(1 "LTHS" 2 "College" )) xlabel(-50000(5000)50000, labsize(vsmall) angle(forty_five) valuelabel) xtitle("Household Income Change") ytitle("Percent Distribution") graphregion(fcolor(white))
-*/
-
-twoway (histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & educ_gp==1, percent width(4000) color(red%30) recast(area) xline(0)) ///
-(histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & educ_gp==2, percent width(4000) color(dkblue%30) recast(area)) ///
-(histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & educ_gp==3, percent width(4000) color(blue%30) recast(area)), ///
-legend(order(1 "LTHS" 2 "Some College" 3 "College" ) size(small) rows(1)) xlabel(-50000(5000)50000, labsize(vsmall) angle(forty_five) valuelabel) ylabel(, labsize(small)) xtitle("Household Income Change") ytitle("Percent Distribution") graphregion(fcolor(white))
-
-
-*Race
-twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000 & race_gp==1, width(4000) percent recast(rarea) xline(0,lcolor(black)) color(gray%40)), xlabel(-70000(70000)70000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change")  ylabel(0(15)15, labsize(small)) ytitle("Percent Distribution") graphregion(fcolor(white)) ysize(4.5) xsize(6)
-
-twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000 & race_gp==2, width(4000) percent recast(rarea) xline(0,lcolor(black)) color(gray%40)), xlabel(-70000(70000)70000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change") ysc(off) ylabel(0(15)15, labsize(small)) ytitle("Percent Distribution") graphregion(fcolor(white)) ysize(4.5) xsize(6)  
-
-twoway (histogram hh_income_raw if hh_income_raw>=-75000 & hh_income_raw<=75000 & race_gp==3, width(4000) percent recast(rarea) xline(0,lcolor(black)) color(gray%40)), xlabel(-70000(70000)70000, labsize(small) angle(ninety) valuelabel) xtitle("Household Income Change") ysc(off) ylabel(0(15)15, labsize(small)) ytitle("Percent Distribution") graphregion(fcolor(white)) ysize(4.5) xsize(6)
-
-twoway (histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & race_gp==1, percent width(4000) color(red%30) recast(area) xline(0)) ///
-(histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & race_gp==2, percent width(4000) color(dkblue%30) recast(area)) ///
-(histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & race_gp==3, percent width(4000) color(blue%30) recast(area)), ///
-legend(order(1 "White" 2 "Black" 3 "Hispanic" ) size(small) rows(1)) xlabel(-50000(5000)50000, labsize(vsmall) angle(forty_five) valuelabel) ylabel(, labsize(small)) xtitle("Household Income Change") ytitle("Percent Distribution") graphregion(fcolor(white))
-
-* Pathway
-forvalues p=1/6{
-	local pathway_`p': label (pathway) `p'
-	twoway (histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & pathway==`p', width(1000) percent recast(rarea) xline(0) color(gray%30)), xtitle("`pathway_`p''")
-	graph export "$results\pathway_histogram_`p'.png", as(png) name("Graph") replace
-}
-
-local pathway_1: label (pathway) 1
-display "`pathway_1'"
-
-* Want to replicate with groups
-twoway (histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & in_pov==1, percent width(5000) color(red%30)) ///
-(histogram hh_income_raw if hh_income_raw>=-50000 & hh_income_raw<=50000 & in_pov==0, percent width(5000) color(dkgreen%30)), ///
-legend(order(1 "In financial hardship" 2 "Not in financial hardship" )) xlabel(-50000(5000)50000, labsize(vsmall) angle(forty_five) valuelabel) xtitle("Household Income Change") ytitle("Percent Distribution") graphregion(fcolor(white))
-
-** Are box plots better?
-graph box hh_income_raw if hh_income_raw>=-100000 & hh_income_raw<=100000, over(educ_gp)
-graph box hh_income_raw if hh_income_raw>=-100000 & hh_income_raw<=100000 & race_gp<4, over(race_gp)
-
-// violinplot hh_income_raw if hh_income_raw>=-100000 & hh_income_raw<=100000
 
 ********************************************************************************
 **# Models to use for heterogeneity paper
@@ -1528,7 +1327,7 @@ test [p1_mean]6.pathway=[p2_mean]6.pathway // sig at 0.06
 
 gen id_use = _n	
 
-browse pre_percentile post_percentile percentile_chg thearn_lag thearn_adj  hh_income_raw
+browse pre_percentile post_percentile percentile_chg thearn_lag thearn_alt  hh_income_raw
 tabstat pre_percentile, by(educ_gp)
 tabstat post_percentile, by(educ_gp)
 tabstat percentile_chg, by(educ_gp)
@@ -1610,7 +1409,7 @@ regress percentile_chg ib3.educ_gp pre_percentile
 regress percentile_chg ib3.educ_gp i.pre_percentile
 est store reg
 
-tab pre_percentile, gen(pre)
+// tab pre_percentile, gen(pre)
 mixed percentile_chg ib3.educ_gp || pre_percentile: pre1 pre2 pre3 pre4 pre5 pre6 pre7 pre8 pre9 pre10 // is this what i want?
 mixed percentile_chg ib3.educ_gp || pre_percentile: pre2 pre3 pre4 pre5 pre6 pre7 pre8 pre9 pre10 // do I need to omit a category, duh kim - yes
 mixed percentile_chg ib3.educ_gp || pre_percentile: pre2 pre3 pre4 pre5 pre6 pre7 pre8 pre9 pre10
@@ -1692,6 +1491,10 @@ list pre_percentile u1 intercept if pre_percentile<=10 & groups
 // attempting to figure out what all these postestimation things do
 mixed percentile_chg ib3.educ_gp || pre_percentile:
 
+drop r_int
+drop yhat_fit
+drop intercept
+
 predict r_int, reffects
 predict yhat
 predict yhat_fit, fitted
@@ -1723,13 +1526,17 @@ predict yhat_fit3, fitted
 browse pre_percentile educ_gp yhat_fit yhat_fit2 yhat_fit3
 
 mixed percentile_chg ib3.educ_gp || pre_percentile: educ_gp // pre2 pre3 pre4 pre5 pre6 pre7 pre8 pre9 pre10
+drop u*
+drop groups
+drop intercept
+
 predict u*, reffects
 bysort pre_percentile: generate groups=(_n==1) 
 list pre_percentile u2 u1 if pre_percentile<=10 & groups
 
 gen intercept = _b[_cons] + u2
-gen slope = _b[educ_gp] + u1 // wait this won't work bc categorical
-list pre_percentile u2 u1 intercept slope if pre_percentile<=10 & groups
+// gen slope = _b[educ_gp] + u1 // wait this won't work bc categorical
+list pre_percentile u2 u1 intercept if pre_percentile<=10 & groups
 
 // is the real value seeing if the residual decreases between this and empty model?
 mixed percentile_chg ib3.educ_gp 
@@ -1781,7 +1588,8 @@ regress hh_income_topcode i.educ_gp
 regress hh_income_topcode i.partnered_all
 regress hh_income_topcode i.partnered_all i.educ_gp // educ becomes sig here (like it does in my MLMs with pathway)
 
-medeff (logit partnered_all i.educ_gp) (logit in_pov i.partnered_all i.educ_gp), mediate(i.partnered_all) treat(i.educ_gp)
+/* Things I tried that did not work
+ medeff (logit partnered_all i.educ_gp) (logit in_pov i.partnered_all i.educ_gp), mediate(i.partnered_all) treat(i.educ_gp)
 
 sgmediation hh_income_topcode, mv(partnered_all) iv(educ_gp)
 sgmediation hh_income_topcode, mv(i.partnered_all) iv(i.educ_gp) // okay can't have factor variables, so just treats as continuous is the only way it works
@@ -1794,6 +1602,7 @@ oaxaca hh_income_topcode i.partnered_all, by(partnered_all) weight(0.5) noisily
 * omega takes the coefficient on education from a pooled regression without an indicator for rural, the group var
 * pooled takes the coefficient on education from a pooled regression with an indicator for rural, the group var
 * weight(0.5) makes a coefficient on education as a 50-50 combination of the coefficients from separate rural and urban regression
+*/
 
 tab educ_gp pathway, row
 mlogit pathway i.educ_gp, base(3) // this is no different to a chi-squared, though, right? without controls?
@@ -1871,9 +1680,9 @@ lincom [m3_mean]3.educ_gp - [m4_mean]3.educ_gp // not sig - college
 //1=lag, 2=year
 rename bw60 bw60_2
 rename bw60lag bw60_1
-rename earnings_adj earnings_2
+rename earnings earnings_2
 rename earnings_lag earnings_1
-rename thearn_adj thearn_2
+rename thearn_alt thearn_2
 rename thearn_lag thearn_1
 rename earnings_ratio earnings_ratio_2
 rename earnings_ratio_lag earnings_ratio_1
@@ -1903,8 +1712,22 @@ save "$tempdir/bw_consequences_long.dta", replace
 ********************************************************************************
 **# To get descriptives for comparison to all eligible mothers
 ********************************************************************************
-use "$tempdir/combined_bw_equation.dta", clear // created in step ab
-drop if survey_yr==1
+use "$SIPP14keep/annual_bw_status2014.dta", clear // created in step 10
+
+// race recode
+recode race (1=1) (2=2)(4=3)(3=4)(5=4), gen(race_gp)
+label define race_gp 1 "White" 2 "Black" 3 "Hispanic"
+label values race_gp race_gp
+
+// education recode
+recode educ (1/2=1) (3=2) (4=3), gen(educ_gp)
+label define educ_gp 1 "Hs or Less" 2 "Some College" 3 "College Plus"
+label values educ_gp educ_gp
+
+// age at first birth recode
+recode ageb1 (-5/19=1) (20/24=2) (25/29=3) (30/55=4), gen(ageb1_cat)
+label define ageb1_cat 1 "Under 20" 2 "A20-24" 3 "A25-29" 4 "Over 30"
+label values ageb1_cat ageb1_cat
 
 tab trans_bw60_alt2 if bw60lag==0 // the 1s here are my 981
 // the comparison, then, are bw60lag == 0 BUT trans_bw60_alt2==0
@@ -1920,10 +1743,6 @@ tab educ_gp, gen(educ)
 ttest educ1 if bw60lag==0, by(trans_bw60_alt2)
 ttest educ2 if bw60lag==0, by(trans_bw60_alt2)
 ttest educ3 if bw60lag==0, by(trans_bw60_alt2)
-
-recode race (1=1)(2=2)(4=3)(3=4)(5=4), gen(race_gp)
-label define race_gp 1 "White" 2 "Black" 3 "Hispanic" 4 "Other"
-label values race_gp race_gp
 
 tab race_gp if trans_bw60_alt2==1 & bw60lag==0
 tab race_gp if trans_bw60_alt2==0 & bw60lag==0
@@ -1951,7 +1770,7 @@ ttest marital3 if bw60lag==0, by(trans_bw60_alt2) // Single
 // create pathway
 sort SSUID PNUM year
 gen earnings_lag = earnings[_n-1] if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1)
-gen thearn_lag = thearn_adj[_n-1] if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1)
+gen thearn_lag = thearn_alt[_n-1] if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1] & year==(year[_n-1]+1)
 
 gen start_from_0 = 0
 replace start_from_0=1 if earnings_lag==0
@@ -2020,10 +1839,10 @@ ttest st_minorchildren if bw60lag==0, by(trans_bw60_alt2)
 ttest end_minorchildren if bw60lag==0, by(trans_bw60_alt2) 
 
 // get income decile distribution
-xtile percentile = thearn_adj, nq(10)
+xtile percentile = thearn_alt, nq(10)
 
 forvalues p=1/10{
-	sum thearn_adj if percentile==`p'
+	sum thearn_alt if percentile==`p'
 }
 
 /*

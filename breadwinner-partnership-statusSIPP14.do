@@ -82,6 +82,25 @@ set maxvar 5500
 	do "$projcode/create-data/10_sipp14_bw_pathways.do"
 	log close
 	
+// Create file indicating hh earners
+	log using "$logdir/bw_hh_earners.log", replace
+	do "$projcode/create-data/11_sipp14_hh_earners.do"
+	log close
+	
 ********************************************************************************
 * A3. EXECUTE ANALYSIS
 ********************************************************************************
+// Create descriptive tables
+	log using "$logdir/bw_descriptive_tables.log", replace
+	do "$projcode/analysis/a_descriptive_tables.do"
+	log close
+	
+// Run models
+	log using "$logdir/bw_models.log", replace
+	do "$projcode/analysis/b_models.do"
+	log close
+
+// Run multilevel models
+	log using "$logdir/bw_multilevel_models.log", replace
+	do "$projcode/analysis/c_multilevel_models.do"
+	log close
