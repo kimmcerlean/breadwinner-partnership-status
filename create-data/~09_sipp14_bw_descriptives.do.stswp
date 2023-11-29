@@ -10,7 +10,7 @@ version 16
 ********************************************************************************
 * Create basic descriptive statistics of what events preceded breadwinning
 * for mothers who became breadwinners during the panel
-* this is now mostly creating variables of changes within a year to use later
+* this is now mostly creating variables of chang
 
 * The data file used in this script was produced by annualize.do
 

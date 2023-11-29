@@ -264,6 +264,8 @@ replace `var'=0 if `var'==2
 }
 
 
+
+
 * Reasons for leaving employer
 label define leave_job 1 "Fired" 2 "Other Involuntary Reason" 3 "Quit Voluntarily" 4 "Retired" 5 "Childcare-related" 6 "Other personal reason" 7 "Illness" 8 "In School"
 
@@ -532,7 +534,7 @@ preserve
 restore
 	
 // create output of sample size with restrictions
-dyndoc "$projcode/sample_size_2014.md", saving($results/sample_size_2014.html) replace
+dyndoc "$SIPP2014_code/sample_size_2014.md", saving($results/sample_size_2014.html) replace
 
 	
 save "$SIPP14keep/sipp14tpearn_all", replace

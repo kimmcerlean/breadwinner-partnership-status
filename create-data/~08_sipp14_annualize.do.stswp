@@ -204,6 +204,10 @@ tab marital_status _merge, m // all missing
 tab educ _merge, m
 drop if _merge==2
 
+	* adding the ratio column to use for the weight correction
+	drop _merge
+	merge m:1 monthcode using "$tempdir/partner_distro_lookup.dta"
+
 	
 	* browse SSUID PNUM monthcode partner spouse relationship2 pairtype2 marital_status partner_lose if pairtype2==2
 
@@ -244,6 +248,13 @@ bysort SSUID PNUM (year): egen year_left = min(year) if partner_lose==1
 bysort SSUID PNUM year (year_left): replace year_left = year_left[1]
 
 browse SSUID PNUM year monthcode partner_lose year_left
+
+gen correction=1
+replace correction = ratio if year == year_left
+
+browse SSUID PNUM year monthcode partner_lose year_left ratio correction
+
+sum correction
 
 gen spousenum=.
 	forvalues n=1/22{
@@ -337,7 +348,7 @@ collapse 	(count) monthsobserved=one  nmos_bw50=mbw50 nmos_bw60=mbw60 				/// mo
 					full_part_sp full_no_sp part_no_sp part_full_sp no_part_sp			///
 					no_full_sp educ_change_sp rmwkwjb weeks_employed_sp					///
 					program_income tanf_amount rtanfyn									///
-			(mean) 	spouse partner numtype2 wpfinwgt scaled_weight birth 				/// 
+			(mean) 	spouse partner numtype2 wpfinwgt scaled_weight correction birth 	/// 
 					mom_panel avg_hhsize = hhsize avg_hrs=tmwkhrs avg_earn=earnings  	///
 					numearner other_earner thincpovt2 pov_level start_marital_status 	///
 					last_marital_status tjb*_annsal1 tjb*_hourly1 tjb*_wkly1  			///

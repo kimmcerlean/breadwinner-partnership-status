@@ -5,29 +5,14 @@
 global homedir "T:"
 
 * STANDARD PROJECT MACROS-------------------------------------------------------
-global projcode 		"$homedir/github/Breadwinner-predictors"
-global logdir 			"$homedir/Research Projects/Breadwinner-predictors/logs"
-global tempdir 			"$homedir/Research Projects/Breadwinner-predictors/data/temp"
+global projcode 		"$homedir/github/breadwinner-partnership-status"
+global logdir 			"$homedir/Research Projects/Breadwinner - partnership status/logs"
+global tempdir 			"$homedir/Research Projects/Breadwinner - partnership status/data"
+global SIPP14keep 		"$homedir/Research Projects/Breadwinner - partnership status/data"
+global combined_data 	"$homedir/Research Projects/Breadwinner - partnership status/data"
 
 // Where you want produced tables, html or putdoc output files to go (NOT SHARED)
-global results 		    "$homedir/Research Projects/Breadwinner-predictors/results"
+global results 		    "$homedir/Research Projects/Breadwinner - partnership status/results"
 
-* PROJECT SPECIFIC MACROS-------------------------------------------------------
-// SIPP 2014
+// Input data: SIPP 2014
 global SIPP2014 		"/data/sipp/2014"
-global SIPP2014_code 	"$projcode/stata/2014"
-global SIPP14keep 		"$homedir/Research Projects/Breadwinner-predictors/data"
-
-// SIPP 1996
-global SIPP1996			"/data/sipp/1996"
-global SIPP1996tm 		"/data/sipp/1996_TM"
-global SIPP1996_code 	"$projcode/stata/1996"
-global SIPP96keep 		"$homedir/Research Projects/Breadwinner-predictors/data"
-
-// CPS / ACS
-global CPS 				"/data/CPS"
-global ACS 				"/data/ACS"
-
-// combined data
-global combined_data 		"$homedir/Research Projects/Breadwinner-predictors/data/combined"
-
