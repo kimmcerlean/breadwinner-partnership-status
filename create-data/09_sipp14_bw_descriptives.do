@@ -198,8 +198,12 @@ sort SSUID PNUM year
 * Using earnings not tpearn which is the sum of all earnings and won't be negative
 * First create a variable that indicates percent change YoY
 
+replace earnings=0 if earnings==. // this is messing up the hh_earn calculations because not considering as 0
+
 by SSUID PNUM (year), sort: gen earn_change = ((earnings-earnings[_n-1])/earnings[_n-1]) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1]
 by SSUID PNUM (year), sort: gen earn_change_raw = (earnings-earnings[_n-1]) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1]
+
+browse SSUID PNUM year earnings earn_change earn_change_raw
 
 // browse SSUID PNUM year earnings earn_change earn_change_raw
 
@@ -228,10 +232,9 @@ by SSUID PNUM (year), sort: gen earn_change_raw = (earnings-earnings[_n-1]) if S
 
 	//check: browse spart_num earnings_sp to_TPEARN* 
 
-replace earnings=0 if earnings==. // this is messing up the hh_earn calculations because not considering as 0
+* then create variables
 replace earnings_a_sp=0 if earnings_a_sp==. // this is messing up the hh_earn calculations because not considering as 0
 
-* then create variables
 by SSUID PNUM (year), sort: gen earn_change_sp = ((earnings_a_sp-earnings_a_sp[_n-1])/earnings_a_sp[_n-1]) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1]
 by SSUID PNUM (year), sort: gen earn_change_raw_sp = (earnings_a_sp-earnings_a_sp[_n-1]) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1]
 
@@ -418,6 +421,14 @@ gen wagesdown8_sp=0
 replace wagesdown8_sp = 1 if wage_chg_sp <=-.0800000
 replace wagesdown8_sp=. if wage_chg_sp==.
 
+// need to recode missings
+local chg_vars "earn_change earn_change_sp earn_change_hh earn_change_oth earn_change_raw earn_change_raw_oth earn_change_raw_hh earn_change_raw_sp hours_change hours_change_sp wage_chg wage_chg_sp earnup8 earndown8 earnup8_sp earndown8_sp earnup8_hh earndown8_hh earnup8_oth earndown8_oth hours_up5 hoursdown5 hours_up5_sp hoursdown5_sp wagesup8 wagesdown8 wagesup8_sp wagesdown8_sp"
+
+foreach var in `chg_vars'{
+	gen `var'_m=`var'
+	replace `var'=0 if `var'==. // updating so base is full sample, even if not applicable, but retaining a version of the variables with missing just in case
+}
+
 // Testing changes from no earnings to earnings for all (Mother, Partner, Others)
 
 by SSUID PNUM (year), sort: gen mom_gain_earn = ((earnings!=. & earnings!=0) & (earnings[_n-1]==. | earnings[_n-1]==0)) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1]
@@ -428,6 +439,7 @@ by SSUID PNUM (year), sort: gen hh_gain_earn = ((hh_earn!=. & hh_earn!=0) & (hh_
 by SSUID PNUM (year), sort: gen hh_lose_earn = ((hh_earn==. | hh_earn==0) & (hh_earn[_n-1]!=. & hh_earn[_n-1]!=0)) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1]
 by SSUID PNUM (year), sort: gen oth_gain_earn = ((other_earn!=. & other_earn!=0) & (other_earn[_n-1]==. | other_earn[_n-1]==0)) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1]
 by SSUID PNUM (year), sort: gen oth_lose_earn = ((other_earn==. | other_earn==0) & (other_earn[_n-1]!=. & other_earn[_n-1]!=0)) if SSUID==SSUID[_n-1] & PNUM==PNUM[_n-1]
+
 
 // recoding change variables to account for both changes in earnings for those already earning as well as adding those who became earners
 
